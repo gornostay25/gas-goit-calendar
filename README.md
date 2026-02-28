@@ -7,6 +7,13 @@ Sync GoIT events into a dedicated Google Calendar (`GoIT Calendar`) using Google
 This project fetches events from the GoIT API and mirrors them into a separate Google Calendar.  
 It is designed for reliable, repeatable synchronization with token refresh handling, duplicate protection, and automatic scheduled execution.
 
+## Demo
+
+
+https://github.com/user-attachments/assets/8953b316-4c5f-4ab1-a8d6-7b2b1c092805
+
+
+
 ## Features
 
 - Creates or reuses a dedicated Google Calendar named `GoIT Calendar`
