@@ -1,0 +1,119 @@
+import { getScriptProperties } from "./config/properties";
+import type { NormalizedGoitEvent } from "./integrations/goit";
+import { log, type GoitSyncWindow } from "./utils";
+
+const GOIT_CALENDAR_NAME = "GoIT Calendar";
+const CALENDAR_ID_PROPERTY = "GOIT_CALENDAR_ID";
+const GOIT_EVENT_ID_TAG = "goitEventId";
+
+type GoitReconcileSummary = {
+	processed: number;
+	scannedExisting: number;
+	created: number;
+	skippedExisting: number;
+	skippedInvalid: number;
+};
+
+export function ensureGoitCalendar(): GoogleAppsScript.Calendar.Calendar {
+	const scriptProperties = getScriptProperties();
+	const storedCalendarId = scriptProperties.getProperty(CALENDAR_ID_PROPERTY);
+	if (storedCalendarId) {
+		const storedCalendar = CalendarApp.getCalendarById(storedCalendarId);
+		if (storedCalendar) {
+			return storedCalendar;
+		}
+	}
+
+	const existingByName = CalendarApp.getCalendarsByName(GOIT_CALENDAR_NAME);
+	const reusable =
+		existingByName.find((calendar) => calendar.isOwnedByMe()) ??
+		existingByName[0];
+	if (reusable) {
+		scriptProperties.setProperty(CALENDAR_ID_PROPERTY, reusable.getId());
+		return reusable;
+	}
+
+	const created = CalendarApp.createCalendar(GOIT_CALENDAR_NAME);
+	// Set user timezone for the calendar
+	created.setTimeZone(Session.getScriptTimeZone());
+	created.setDescription("@gornostay25");
+	created.setColor(CalendarApp.Color.ORANGE.toString());
+	scriptProperties.setProperty(CALENDAR_ID_PROPERTY, created.getId());
+	return created;
+}
+
+export function reconcileGoitEvents(
+	calendar: GoogleAppsScript.Calendar.Calendar,
+	goitEvents: NormalizedGoitEvent[],
+	window: GoitSyncWindow,
+): GoitReconcileSummary {
+	const existingEvents = calendar.getEvents(window.start, window.end);
+	const existingGoitEventIds = collectExistingGoitEventIds(existingEvents);
+
+	let created = 0;
+	let skippedExisting = 0;
+	let skippedInvalid = 0;
+
+	for (const goitEvent of goitEvents) {
+		const goitEventId = goitEvent.goitEventId.trim();
+		if (!goitEventId) {
+			skippedInvalid += 1;
+			continue;
+		}
+
+		if (existingGoitEventIds.has(goitEventId)) {
+			skippedExisting += 1;
+			log({
+				message: "Skipping existing event",
+				goitEvent,
+			});
+			continue;
+		}
+
+		const createdEvent = createCalendarEvent(calendar, goitEvent);
+		createdEvent.setTag(GOIT_EVENT_ID_TAG, goitEventId);
+		existingGoitEventIds.add(goitEventId);
+		created += 1;
+	}
+
+	return {
+		processed: goitEvents.length,
+		scannedExisting: existingEvents.length,
+		created,
+		skippedExisting,
+		skippedInvalid,
+	};
+}
+
+function collectExistingGoitEventIds(
+	existingEvents: GoogleAppsScript.Calendar.CalendarEvent[],
+): Set<string> {
+	const ids = new Set<string>();
+	for (const event of existingEvents) {
+		const goitEventId = event.getTag(GOIT_EVENT_ID_TAG)?.trim();
+		if (goitEventId) {
+			ids.add(goitEventId);
+		}
+	}
+
+	return ids;
+}
+
+function createCalendarEvent(
+	calendar: GoogleAppsScript.Calendar.Calendar,
+	goitEvent: NormalizedGoitEvent,
+): GoogleAppsScript.Calendar.CalendarEvent {
+	log({
+		message: "Creating event",
+		goitEvent,
+	});
+	if (goitEvent.isAllDay) {
+		return calendar.createAllDayEvent(goitEvent.title, goitEvent.start, {
+			description: goitEvent.description,
+		});
+	}
+
+	return calendar.createEvent(goitEvent.title, goitEvent.start, goitEvent.end, {
+		description: goitEvent.description,
+	});
+}

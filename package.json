@@ -1,0 +1,42 @@
+{
+	"name": "gas-goit-calendar",
+	"description": "Sync GoIT events into a dedicated Google Calendar with Google Apps Script.",
+	"version": "1.0.0",
+	"author": "Volodymyr Palamar <me@gornostay25.dev>",
+	"license": "MIT",
+	"type": "module",
+	"private": true,
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/gornostay25/gas-goit-calendar.git"
+	},
+	"scripts": {
+		"build": "bun run ./scripts/build.ts",
+		"create": "clasp create --title 'GoIT Calendar Integration' --rootDir 'dist/' && cp dist/appsscript.json appsscript.json",
+		"deploy": "clasp push",
+		"format": "biome format --write",
+		"lint": "biome lint --write",
+		"lint:fix": "biome lint --write --fix",
+		"prepare": "husky || true"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "2.4.4",
+		"@google/clasp": "^3.2.0",
+		"@types/google-apps-script": "^2.0.8",
+		"bun-types": "^1.3.10",
+		"husky": "^9.1.7",
+		"lint-staged": "^16.3.0"
+	},
+	"peerDependencies": {
+		"typescript": "^5"
+	},
+	"lint-staged": {
+		"*.{js,ts}": [
+			"biome lint --write",
+			"biome format --write"
+		],
+		"*.{json,md}": [
+			"biome format --write"
+		]
+	}
+}
