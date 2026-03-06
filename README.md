@@ -19,6 +19,7 @@ https://github.com/user-attachments/assets/8953b316-4c5f-4ab1-a8d6-7b2b1c092805
 - Creates or reuses a dedicated Google Calendar named `GoIT Calendar`
 - Imports GoIT events into Google Calendar within a configurable time window
 - Prevents duplicate events using stable GoIT event IDs stored as event tags
+- Updates existing events when GoIT events change time or date
 - Refreshes GoIT access tokens automatically on `401 Unauthorized`
 - Set events based on user timezone
 - Installs an hourly trigger via `SETUP()` for automated sync
@@ -106,6 +107,8 @@ If tokens are missing, the script logs step-by-step instructions in execution lo
    - Ensures dedicated calendar exists
    - Fetches GoIT events for the configured window
    - Creates only missing events (deduplicated by GoIT event ID tag)
+   - Updates existing events if time/date changed
+   - Skips unchanged existing events
 
 ## Development Workflow
 

@@ -71,7 +71,7 @@ const buildResult = await Bun.build({
 						: [];
 					const newContents = contents.replace(REGEXP_EXPORT, "");
 					await file.write(
-						banner + "\n" + exportedFunctions.join("") + newContents,
+						`${banner}\n${exportedFunctions.join("")}\n${newContents}`,
 					);
 				});
 			},

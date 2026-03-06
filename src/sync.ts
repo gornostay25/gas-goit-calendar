@@ -10,6 +10,7 @@ type GoitReconcileSummary = {
 	processed: number;
 	scannedExisting: number;
 	created: number;
+	updated: number;
 	skippedExisting: number;
 	skippedInvalid: number;
 };
@@ -51,6 +52,7 @@ export function reconcileGoitEvents(
 	const existingGoitEventIds = collectExistingGoitEventIds(existingEvents);
 
 	let created = 0;
+	let updated = 0;
 	let skippedExisting = 0;
 	let skippedInvalid = 0;
 
@@ -61,18 +63,28 @@ export function reconcileGoitEvents(
 			continue;
 		}
 
-		if (existingGoitEventIds.has(goitEventId)) {
-			skippedExisting += 1;
-			log({
-				message: "Skipping existing event",
-				goitEvent,
-			});
+		const existingGoogleEvent = existingGoitEventIds.get(goitEventId);
+		if (existingGoogleEvent) {
+			if (isEventChanged(existingGoogleEvent, goitEvent)) {
+				updateCalendarEvent(existingGoogleEvent, goitEvent);
+				updated += 1;
+				log({
+					message: "Updated event",
+					goitEvent,
+					existingGoogleEvent,
+				});
+			} else {
+				skippedExisting += 1;
+				log({
+					message: "Skipping existing event",
+					goitEvent,
+				});
+			}
 			continue;
 		}
 
 		const createdEvent = createCalendarEvent(calendar, goitEvent);
 		createdEvent.setTag(GOIT_EVENT_ID_TAG, goitEventId);
-		existingGoitEventIds.add(goitEventId);
 		created += 1;
 	}
 
@@ -80,6 +92,7 @@ export function reconcileGoitEvents(
 		processed: goitEvents.length,
 		scannedExisting: existingEvents.length,
 		created,
+		updated,
 		skippedExisting,
 		skippedInvalid,
 	};
@@ -87,16 +100,58 @@ export function reconcileGoitEvents(
 
 function collectExistingGoitEventIds(
 	existingEvents: GoogleAppsScript.Calendar.CalendarEvent[],
-): Set<string> {
-	const ids = new Set<string>();
+): Map<string, GoogleAppsScript.Calendar.CalendarEvent> {
+	const eventMap = new Map<string, GoogleAppsScript.Calendar.CalendarEvent>();
 	for (const event of existingEvents) {
 		const goitEventId = event.getTag(GOIT_EVENT_ID_TAG)?.trim();
 		if (goitEventId) {
-			ids.add(goitEventId);
+			eventMap.set(goitEventId, event);
 		}
 	}
 
-	return ids;
+	return eventMap;
+}
+
+function isEventChanged(
+	googleEvent: GoogleAppsScript.Calendar.CalendarEvent,
+	goitEvent: NormalizedGoitEvent,
+): boolean {
+	const googleStartTime = googleEvent.getStartTime();
+	const googleEndTime = googleEvent.getEndTime();
+	const googleAllDay = googleEvent.isAllDayEvent();
+
+	// Compare start time
+	if (googleStartTime?.getTime() !== goitEvent.start.getTime()) {
+		return true;
+	}
+
+	// Compare end time
+	if (googleEndTime?.getTime() !== goitEvent.end.getTime()) {
+		return true;
+	}
+
+	// Compare all-day flag
+	if (googleAllDay !== goitEvent.isAllDay) {
+		return true;
+	}
+
+	return false;
+}
+
+function updateCalendarEvent(
+	googleEvent: GoogleAppsScript.Calendar.CalendarEvent,
+	goitEvent: NormalizedGoitEvent,
+): void {
+	log({
+		message: "Updating event",
+		goitEvent,
+	});
+
+	if (goitEvent.isAllDay) {
+		googleEvent.setAllDayDate(goitEvent.start);
+	} else {
+		googleEvent.setTime(goitEvent.start, goitEvent.end);
+	}
 }
 
 function createCalendarEvent(
