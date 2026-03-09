@@ -2,9 +2,13 @@ import { fetchGoitCalendarEvents } from "./integrations/goit";
 import { ensureGoitCalendar, reconcileGoitEvents } from "./sync";
 import { getSyncWindow, log } from "./utils";
 import {
+	DEFAULT_EVENT_REMINDER_OPTIONS,
 	getGoitGroupIds,
+	getOptionalJSONProperty,
 	getOptionalProperty,
 	PROPERTY_KEYS,
+	setProperties,
+	type EventReminderOptions,
 } from "./config/properties";
 
 const SYNC_LOCK_WAIT_MS = 5000;
@@ -73,6 +77,29 @@ function setupTrigger() {
 
 	log(`Clock trigger created: GoIT Calendar Sync every 1 hour`);
 }
+
+function setupReminders() {
+	const reminders = getOptionalJSONProperty<EventReminderOptions>(
+		PROPERTY_KEYS.GCAL_REMINDERS,
+	);
+	if (!reminders) {
+		log({
+			message: "Reminders are not configured, using default options",
+			reminders: DEFAULT_EVENT_REMINDER_OPTIONS,
+		});
+		setProperties({
+			[PROPERTY_KEYS.GCAL_REMINDERS]: JSON.stringify(
+				DEFAULT_EVENT_REMINDER_OPTIONS,
+			),
+		});
+	} else {
+		log({
+			message: "Reminders are configured",
+			reminders,
+		});
+	}
+}
+
 export function SETUP() {
 	const banner = [
 		" ▗▄▄▖ ▗▄▖ ▗▄▄▄▖▗▄▄▄▖     ▗▄▄▖ ▗▄▖ ▗▖   ▗▄▄▄▖▗▖  ▗▖▗▄▄▄  ▗▄▖ ▗▄▄▖      ▗▄▄▖▗▖  ▗▖▗▖  ▗▖ ▗▄▄▖",
@@ -104,7 +131,26 @@ export function SETUP() {
 		return;
 	}
 
+	console.info(
+		[
+			"Event Reminders:",
+			"================",
+			"By default, popup reminders are set to 15 minutes before each event.",
+			"You can customize reminders by setting the GCAL_REMINDERS property:",
+			"",
+			'Example: {"email": 0, "sms": 0, "popup": 15}',
+			"  - email: minutes before event for email reminder (0 = disabled)",
+			"  - sms: minutes before event for SMS reminder (0 = disabled)",
+			"  - popup: minutes before event for popup notification (0 = disabled)",
+			"",
+			"Multiple values can be set simultaneously.",
+			"All times are in minutes.",
+			"Valid range: 1 to 40320 (4 weeks) minutes before event.",
+		].join("\n"),
+	);
+
 	setupTrigger();
+	setupReminders();
 	log("Setup completed.");
 	runSyncHandler();
 }

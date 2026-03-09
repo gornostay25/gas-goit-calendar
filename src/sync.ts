@@ -1,4 +1,9 @@
-import { getScriptProperties } from "./config/properties";
+import {
+	getRequiredJSONProperty,
+	getScriptProperties,
+	PROPERTY_KEYS,
+	type EventReminderOptions,
+} from "./config/properties";
 import type { NormalizedGoitEvent } from "./integrations/goit";
 import { log, type GoitSyncWindow } from "./utils";
 
@@ -50,6 +55,9 @@ export function reconcileGoitEvents(
 ): GoitReconcileSummary {
 	const existingEvents = calendar.getEvents(window.start, window.end);
 	const existingGoitEventIds = collectExistingGoitEventIds(existingEvents);
+	const reminders = getRequiredJSONProperty<EventReminderOptions>(
+		PROPERTY_KEYS.GCAL_REMINDERS,
+	);
 
 	let created = 0;
 	let updated = 0;
@@ -85,6 +93,33 @@ export function reconcileGoitEvents(
 
 		const createdEvent = createCalendarEvent(calendar, goitEvent);
 		createdEvent.setTag(GOIT_EVENT_ID_TAG, goitEventId);
+
+		/**
+		 * The maximum number of minutes before an event that a reminder can be set is 40,320 (4 weeks).
+		 * @see https://developers.google.com/apps-script/reference/calendar/calendar-event#addpopupreminderminutesbefore
+		 */
+		const maxReminderMinutes = 40320;
+		if (
+			reminders.popup &&
+			reminders.popup > 0 &&
+			reminders.popup < maxReminderMinutes
+		) {
+			createdEvent.addPopupReminder(reminders.popup);
+		}
+		if (
+			reminders.email &&
+			reminders.email > 0 &&
+			reminders.email < maxReminderMinutes
+		) {
+			createdEvent.addEmailReminder(reminders.email);
+		}
+		if (
+			reminders.sms &&
+			reminders.sms > 0 &&
+			reminders.sms < maxReminderMinutes
+		) {
+			createdEvent.addSmsReminder(reminders.sms);
+		}
 		created += 1;
 	}
 
@@ -120,18 +155,12 @@ function isEventChanged(
 	const googleEndTime = googleEvent.getEndTime();
 	const googleAllDay = googleEvent.isAllDayEvent();
 
-	// Compare start time
-	if (googleStartTime?.getTime() !== goitEvent.start.getTime()) {
-		return true;
-	}
-
-	// Compare end time
-	if (googleEndTime?.getTime() !== goitEvent.end.getTime()) {
-		return true;
-	}
-
-	// Compare all-day flag
-	if (googleAllDay !== goitEvent.isAllDay) {
+	// Compare event details
+	if (
+		googleStartTime?.getTime() !== goitEvent.start.getTime() ||
+		googleEndTime?.getTime() !== goitEvent.end.getTime() ||
+		googleAllDay !== goitEvent.isAllDay
+	) {
 		return true;
 	}
 

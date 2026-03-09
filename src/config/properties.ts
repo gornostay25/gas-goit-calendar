@@ -7,7 +7,20 @@ export const PROPERTY_KEYS = {
 	GOIT_GROUP_IDS: "GOIT_GROUP_IDS",
 	GOIT_ACCESS_TOKEN: "GOIT_ACCESS_TOKEN",
 	GOIT_REFRESH_TOKEN: "GOIT_REFRESH_TOKEN",
+	GCAL_REMINDERS: "GCAL_REMINDERS",
 } as const;
+
+export type EventReminderOptions = {
+	email: number;
+	sms: number;
+	popup: number;
+};
+
+export const DEFAULT_EVENT_REMINDER_OPTIONS: EventReminderOptions = {
+	email: 0,
+	sms: 0,
+	popup: 15,
+};
 
 export function getScriptProperties(): GoogleAppsScript.Properties.Properties {
 	return PropertiesService.getScriptProperties();
@@ -15,6 +28,18 @@ export function getScriptProperties(): GoogleAppsScript.Properties.Properties {
 
 export function getOptionalProperty(key: string): string | null {
 	return getScriptProperties().getProperty(key);
+}
+
+export function getOptionalJSONProperty<T>(key: string): T | null {
+	try {
+		const value = getScriptProperties().getProperty(key);
+		if (!value) {
+			return null;
+		}
+		return JSON.parse(value) as T;
+	} catch {
+		return null;
+	}
 }
 
 export function setProperties(values: Record<string, string>): void {
@@ -27,6 +52,14 @@ export function getRequiredProperty(key: string): string {
 		throw new Error(`Missing required Script Property: ${key}`);
 	}
 	return value;
+}
+
+export function getRequiredJSONProperty<T>(key: string): T {
+	const value = getOptionalJSONProperty<T>(key);
+	if (!value) {
+		throw new Error(`Missing required Script Property: ${key}`);
+	}
+	return value as T;
 }
 
 export function getGoitGroupIds(): string[] {
