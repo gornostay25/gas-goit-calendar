@@ -20,6 +20,7 @@ https://github.com/user-attachments/assets/8953b316-4c5f-4ab1-a8d6-7b2b1c092805
 - Imports GoIT events into Google Calendar within a configurable time window
 - Prevents duplicate events using stable GoIT event IDs stored as event tags
 - Updates existing events when GoIT events change time or date
+- Configurable event reminders (email, SMS, popup)
 - Refreshes GoIT access tokens automatically on `401 Unauthorized`
 - Set events based on user timezone
 - Installs an hourly trigger via `SETUP()` for automated sync
@@ -91,6 +92,25 @@ After deployment, open your Apps Script project and set **Script Properties**:
 | `GOIT_GROUP_IDS` | No | empty | Comma-separated GoIT group IDs |
 | `SYNC_PAST_DAYS` | No | `7` | Number of days to sync in the past |
 | `SYNC_FUTURE_DAYS` | No | `60` | Number of days to sync in the future |
+| `GCAL_REMINDERS` | No | `{"email": 0, "sms": 0, "popup": 15}` | Event reminder configuration |
+
+### Event Reminders
+
+The `GCAL_REMINDERS` property allows you to configure event notifications:
+
+```json
+{
+  "email": 30,
+  "sms": 0,
+  "popup": 15
+}
+```
+
+- **email**: Minutes before event for email reminder (0 = disabled)
+- **sms**: Minutes before event for SMS reminder (0 = disabled)
+- **popup**: Minutes before event for popup notification (0 = disabled)
+
+Multiple reminder types can be enabled simultaneously. All times are in minutes. Valid range: 5 to 40320 (4 weeks) minutes before the event.
 
 ### How to obtain GoIT tokens
 
@@ -100,15 +120,17 @@ If tokens are missing, the script logs step-by-step instructions in execution lo
 ## Runtime Flow
 
 1. `SETUP()` checks token presence
-2. Creates an hourly time-driven trigger (if not already present)
-3. Starts an immediate sync run
-4. Each run:
+2. Sets up default event reminders if not configured
+3. Creates an hourly time-driven trigger (if not already present)
+4. Starts an immediate sync run
+5. Each run:
    - Acquires script lock to avoid concurrent sync
    - Ensures dedicated calendar exists
    - Fetches GoIT events for the configured window
    - Creates only missing events (deduplicated by GoIT event ID tag)
    - Updates existing events if time/date changed
    - Skips unchanged existing events
+   - Applies configured reminders to new and updated events
 
 ## Development Workflow
 
@@ -116,11 +138,11 @@ If tokens are missing, the script logs step-by-step instructions in execution lo
 # Build
 bun run build
 
-# Lint
-bun run lint
-
 # Format
 bun run format
+
+# Lint
+bun run lint
 ```
 
 
